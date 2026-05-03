@@ -7,6 +7,7 @@ import json
 from typing import Any
 from ollama import chat
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -87,3 +88,20 @@ def _looks_imperative(sentence: str) -> bool:
         "investigate",
     }
     return first.lower() in imperative_starters
+
+def extract_action_items_llm(text: str) -> List[str]:
+    class ActionItems(BaseModel):
+        action_items: List[str]
+
+    response = chat(
+        messages=[
+            {
+                'role': 'user',
+                'content': f'Extract action items from the following text: {text}',
+            }
+        ],
+        model='llama3.1:8b',
+        format=ActionItems.model_json_schema(),
+    )
+    return ActionItems.model_validate_json(response.message.content).action_items
+
