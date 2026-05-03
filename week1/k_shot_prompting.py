@@ -7,14 +7,47 @@ load_dotenv()
 NUM_RUNS_TIMES = 5
 
 # TODO: Fill this in!
-YOUR_SYSTEM_PROMPT = ""
+YOUR_SYSTEM_PROMPT = """
+You reverse words exactly.
+
+Important:
+- Output ONLY the reversed word.
+- Do NOT explain.
+- Do NOT show steps.
+- Do NOT add spaces.
+- Do NOT add quotes.
+- Reverse by characters, not by syllables or meaning.
+
+Method:
+Read the input word from the last character to the first character.
+Write each character in that order.
+
+Examples:
+
+Input: abc
+Output: cba
+
+Input: dog
+Output: god
+
+Input: status
+Output: sutats
+
+Input: http
+Output: ptth
+
+Input: httpstatus
+Output: sutatsptth
+
+When the user gives a word to reverse, output only the reversed word.
+"""
+
 
 USER_PROMPT = """
 Reverse the order of letters in the following word. Only output the reversed word, no other text:
 
 httpstatus
 """
-
 
 EXPECTED_OUTPUT = "sutatsptth"
 

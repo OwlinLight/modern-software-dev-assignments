@@ -70,7 +70,10 @@ TOOL_REGISTRY: Dict[str, Callable[..., str]] = {
 # ==========================
 
 # TODO: Fill this in!
-YOUR_SYSTEM_PROMPT = ""
+YOUR_SYSTEM_PROMPT = """
+Here are avaliable tools
+
+"""
 
 
 def resolve_path(p: str) -> str:
@@ -109,6 +112,7 @@ def run_model_for_tool_call(system_prompt: str) -> Dict[str, Any]:
         options={"temperature": 0.3},
     )
     content = response.message.content
+    print(f"debug - content: {content}")
     return extract_tool_call(content)
 
 
