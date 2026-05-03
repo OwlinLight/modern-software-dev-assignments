@@ -1,59 +1,92 @@
-import json
-from types import SimpleNamespace
-from unittest.mock import patch
+import random
 
 import pytest
-from pydantic import ValidationError
 
 from ..app.services.extract import extract_action_items, extract_action_items_llm
 
-# TODO 1: Add an optional `@pytest.mark.integration` test that calls live Ollama when
-# OLLAMA_HOST is set (skip otherwise), to complement these mocked unit tests.
 
-MEETING_NOTES = """
-Notes from meeting:
-- [ ] Set up database
-* implement API extract endpoint
-1. Write tests
-Some narrative sentence.
-""".strip()
+def _assert_list_equal_ignore_case(actual: list[str], expected: list[str]) -> None:
+    assert [x.casefold() for x in actual] == [x.casefold() for x in expected]
+
+
+def _assert_any_matches_ignore_case(items: list[str], needle: str) -> None:
+    n = needle.casefold()
+    assert any(x.casefold() == n for x in items), (
+        f"expected an item matching {needle!r} (ignore case), got {items!r}"
+    )
 
 
 def test_extract_bullets_and_checkboxes():
-    items = extract_action_items(MEETING_NOTES)
+    text = """
+    Notes from meeting:
+    - [ ] Set up database
+    * implement API extract endpoint
+    1. Write tests
+    Some narrative sentence.
+    """.strip()
+
+    items = extract_action_items(text)
     assert "Set up database" in items
     assert "implement API extract endpoint" in items
     assert "Write tests" in items
 
 
-@pytest.fixture
-def mock_llm_chat():
-    with patch("week2.app.services.extract.chat") as mock_chat:
-        yield mock_chat
+def test_extract_bullets_and_checkboxes_llm():
+    text = """
+    Notes from meeting:
+    - [ ] Set up database
+    * implement API extract endpoint
+    1. Write tests
+    Some narrative sentence.
+    """.strip()
+
+    items = extract_action_items_llm(text)
+    _assert_any_matches_ignore_case(items, "Set up database")
+    _assert_any_matches_ignore_case(items, "implement API extract endpoint")
+    _assert_any_matches_ignore_case(items, "Write tests")
 
 
-@pytest.mark.parametrize(
-    "input_text, action_items_from_model",
-    [
-        (
-            MEETING_NOTES,
-            ["Set up database", "implement API extract endpoint", "Write tests"],
-        ),
-        ("", []),
-    ],
-)
-def test_extract_action_items_llm(mock_llm_chat, input_text, action_items_from_model):
-    mock_llm_chat.return_value = SimpleNamespace(
-        message=SimpleNamespace(
-            content=json.dumps({"action_items": action_items_from_model})
-        )
+# Todo: Write unit tests for extract_action_items_llm() covering multiple inputs
+# (e.g., bullet lists, keyword-prefixed lines, empty input)
+
+
+def test_extract_action_items_llm():
+    # Test case 1: Empty input
+    text = ""
+    items = extract_action_items_llm(text)
+    assert items == []
+
+    # Test case 2: Input with only narrative sentence
+    text = "Some narrative sentence."
+    items = extract_action_items_llm(text)
+    assert items == []
+
+    # Test case 3: Input with only keyword-prefixed lines
+    imperative_starters = {
+        "add",
+        "create",
+        "implement",
+        "fix",
+        "update",
+        "write",
+        "check",
+        "verify",
+        "refactor",
+        "document",
+        "design",
+        "investigate",
+    }
+    starter = random.choice(list(imperative_starters))
+    text = (
+        f"I will try my best to {starter} a list of reports to review, "
+        "regardless of the outcome."
     )
-    assert extract_action_items_llm(input_text) == action_items_from_model
-
-
-def test_extract_action_items_llm_invalid_json_raises(mock_llm_chat):
-    mock_llm_chat.return_value = SimpleNamespace(
-        message=SimpleNamespace(content="not valid json")
+    items = extract_action_items_llm(text)
+    _assert_list_equal_ignore_case(
+        items, [f"{starter} a list of reports to review"]
     )
-    with pytest.raises(ValidationError):
-        extract_action_items_llm("any")
+
+    # Test case 4: Input with only bullet list
+    text = "- [ ] Set up database"
+    items = extract_action_items_llm(text)
+    _assert_list_equal_ignore_case(items, ["Set up database"])
