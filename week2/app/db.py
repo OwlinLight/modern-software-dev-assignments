@@ -8,6 +8,11 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "app.db"
 
+
+class InvalidNoteIdError(Exception):
+    """note_id does not exist (foreign key constraint)."""
+
+
 _NOTE_SELECT = "SELECT id, content, created_at FROM notes"
 _ACTION_ITEM_SELECT = "SELECT id, note_id, text, done, created_at FROM action_items"
 
@@ -74,14 +79,31 @@ def insert_action_items(items: list[str], note_id: int | None = None) -> list[in
     with get_connection() as conn:
         cur = conn.cursor()
         ids: list[int] = []
-        for item in items:
-            cur.execute(
-                "INSERT INTO action_items (note_id, text) VALUES (?, ?)",
-                (note_id, item),
-            )
-            ids.append(int(cur.lastrowid))
+        try:
+            for item in items:
+                cur.execute(
+                    "INSERT INTO action_items (note_id, text) VALUES (?, ?)",
+                    (note_id, item),
+                )
+                ids.append(int(cur.lastrowid))
+        except sqlite3.IntegrityError as exc:
+            if "foreign key" in str(exc).lower():
+                raise InvalidNoteIdError from exc
+            raise
         conn.commit()
         return ids
+
+
+def mark_action_item_done(action_item_id: int, done: bool) -> int:
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE action_items SET done = ? WHERE id = ?",
+            (1 if done else 0, action_item_id),
+        )
+        n = cur.rowcount
+        conn.commit()
+        return n
 
 
 def list_action_items(note_id: int | None = None) -> list[sqlite3.Row]:
@@ -95,13 +117,3 @@ def list_action_items(note_id: int | None = None) -> list[sqlite3.Row]:
                 (note_id,),
             )
         return list(cur.fetchall())
-
-
-def mark_action_item_done(action_item_id: int, done: bool) -> None:
-    with get_connection() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            "UPDATE action_items SET done = ? WHERE id = ?",
-            (1 if done else 0, action_item_id),
-        )
-        conn.commit()

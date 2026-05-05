@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 from typing import List
-import json
-from typing import Any
-from ollama import chat
+
+import httpx
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from fastapi import HTTPException
+from ollama import Client, RequestError, ResponseError
+from pydantic import BaseModel, ValidationError
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 BULLET_PREFIX_PATTERN = re.compile(r"^\s*([-*•]|\d+\.)\s+")
 KEYWORD_PREFIXES = (
@@ -93,15 +98,40 @@ def extract_action_items_llm(text: str) -> List[str]:
     class ActionItems(BaseModel):
         action_items: List[str]
 
-    response = chat(
-        messages=[
-            {
-                'role': 'user',
-                'content': f'Extract action items from the following text: {text}',
-            }
-        ],
-        model='llama3.1:8b',
-        format=ActionItems.model_json_schema(),
-    )
-    return ActionItems.model_validate_json(response.message.content).action_items
+    schema = ActionItems.model_json_schema()
+    timeout = float(os.getenv("OLLAMA_TIMEOUT", "120"))
+    client = Client(timeout=timeout)
+    try:
+        response = client.chat(
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Extract action items from the following text: {text}",
+                }
+            ],
+            model="llama3.1:8b",
+            format=schema,
+        )
+    except (
+        ConnectionError,
+        RequestError,
+        ResponseError,
+        httpx.RequestError,
+    ) as exc:
+        logger.exception("Ollama request failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Model service unavailable",
+        ) from exc
+
+    raw = response.message.content
+    try:
+        return ActionItems.model_validate_json(raw).action_items
+    except (ValidationError, json.JSONDecodeError, ValueError) as exc:
+        logger.debug("Invalid LLM JSON response: %r", raw, exc_info=True)
+        logger.warning("LLM response could not be parsed as structured action items")
+        raise HTTPException(
+            status_code=502,
+            detail="Model returned an invalid response",
+        ) from exc
 
