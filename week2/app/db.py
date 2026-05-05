@@ -73,6 +73,13 @@ def get_note(note_id: int) -> sqlite3.Row | None:
         return cur.fetchone()
 
 
+def list_notes() -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(f"{_NOTE_SELECT} ORDER BY id DESC")
+        return list(cur.fetchall())
+
+
 def insert_action_items(items: list[str], note_id: int | None = None) -> list[int]:
     if not items:
         return []

@@ -8,6 +8,23 @@ from ..schemas.notes import NoteCreateRequest, NoteOut
 router = APIRouter(prefix="/notes", tags=["notes"])
 
 
+@router.get(
+    "",
+    response_model=list[NoteOut],
+    summary="List all notes",
+)
+def get_all_notes() -> list[NoteOut]:
+    rows = db.list_notes()
+    return [
+        NoteOut(
+            id=row["id"],
+            content=row["content"],
+            created_at=row["created_at"],
+        )
+        for row in rows
+    ]
+
+
 @router.post(
     "",
     response_model=NoteOut,
