@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ActionItemExtractRequest(BaseModel):
-    """POST /action-items/extract — body."""
+    """POST /action-items/extract or /action-items/extract/llm — body."""
 
     text: str = Field(..., description="Source text to scan for tasks and action items.")
     save_note: bool = Field(

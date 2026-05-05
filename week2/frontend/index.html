@@ -23,26 +23,35 @@
     <textarea id="text" placeholder="Paste notes here...&#10;e.g.&#10;- [ ] Set up database&#10;- Implement extract endpoint"></textarea>
     <div class="row">
       <label class="row"><input id="save_note" type="checkbox" checked /> Save as note</label>
-      <button id="extract">Extract</button>
+      <button id="extract" type="button">Extract (rules)</button>
+      <button id="extract_llm" type="button">Extract (LLM)</button>
     </div>
+    <p class="muted">Rules: fast, offline heuristics. LLM: uses Ollama (<code>llama3.1:8b</code>) — requires a running model.</p>
 
     <div class="items" id="items"></div>
 
     <script>
       const $ = (sel) => document.querySelector(sel);
       const itemsEl = $('#items');
-      const btn = $('#extract');
-      btn.addEventListener('click', async () => {
+
+      async function runExtract(path, label) {
         const text = $('#text').value;
         const save = $('#save_note').checked;
-        itemsEl.textContent = 'Extracting...';
+        itemsEl.textContent = label + '…';
         try {
-          const res = await fetch('/action-items/extract', {
+          const res = await fetch(path, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, save_note: save }),
           });
-          if (!res.ok) throw new Error('Request failed');
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            const detail = errBody.detail;
+            const msg = typeof detail === 'string' ? detail
+              : Array.isArray(detail) ? detail.map((d) => d.msg || d).join(' ')
+              : 'Request failed';
+            throw new Error(msg);
+          }
           const data = await res.json();
           if (!data.items || data.items.length === 0) {
             itemsEl.innerHTML = '<p class="muted">No action items found.</p>';
@@ -63,10 +72,14 @@
           });
         } catch (err) {
           console.error(err);
-          itemsEl.textContent = 'Error extracting items';
+          itemsEl.textContent = err.message || 'Error extracting items';
         }
-      });
+      }
 
+      $('#extract').addEventListener('click', () =>
+        runExtract('/action-items/extract', 'Extracting (rules)'));
+      $('#extract_llm').addEventListener('click', () =>
+        runExtract('/action-items/extract/llm', 'Extracting (LLM)'));
     </script>
   </body>
   </html>
