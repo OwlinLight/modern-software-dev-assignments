@@ -2,14 +2,16 @@ import inspect
 import json
 import os
 
-from openai import OpenAI
 from dotenv import load_dotenv
+from google import genai
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 load_dotenv()
 
-openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+gemini_client = genai.Client(
+    api_key=os.environ.get("GEMINI_API_KEY") or os.environ["GOOGLE_API_KEY"]
+)
 
 SYSTEM_PROMPT = """
 You are a coding assistant whose goal it is to help us solve coding tasks. 
@@ -144,12 +146,14 @@ def extract_tool_invocations(text: str) -> List[Tuple[str, Dict[str, Any]]]:
     return invocations
 
 def execute_llm_call(conversation: List[Dict[str, str]]):
-    response = openai_client.chat.completions.create(
-        model="gpt-5",
-        messages=conversation,
-        max_completion_tokens=2000
+    prompt = "\n\n".join(
+        f"{message['role'].upper()}: {message['content']}" for message in conversation
     )
-    return response.choices[0].message.content
+    response = gemini_client.models.generate_content(
+        model="gemini-3.5-flash",
+        contents=prompt,
+    )
+    return response.text
 
 def run_coding_agent_loop():
     print(get_full_system_prompt())
