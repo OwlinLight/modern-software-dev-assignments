@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 from fastmcp import FastMCP
 
 mcp = FastMCP(name="SimpleMCPTestServer")
@@ -15,14 +15,13 @@ def resolve_abs_path(path_str: str) -> Path:
     return path
 
 @mcp.tool
-def read_file_tool(filename: str) -> Dict[str, Any]:
+async def read_file_tool(filename: str) -> Dict[str, Any]:
     """
     Gets the full content of a file provided by the user.
     :param filename: The name of the file to read.
     :return: The full content of the file.
     """
     full_path = resolve_abs_path(filename)
-    print(full_path)
     # TODO (mihail): Be more defensive in the file reading here
     with open(str(full_path), "r") as f:
         content = f.read()
@@ -32,7 +31,7 @@ def read_file_tool(filename: str) -> Dict[str, Any]:
     }
 
 @mcp.tool
-def list_files_tool(path: str) -> Dict[str, Any]:
+async def list_files_tool(path: str) -> Dict[str, Any]:
     """
     Lists the files in a directory provided by the user.
     :param path: The path to the directory to list files from.
@@ -51,7 +50,7 @@ def list_files_tool(path: str) -> Dict[str, Any]:
     }
 
 @mcp.tool
-def edit_file_tool(path: str, old_str: str, new_str: str) -> Dict[str, Any]:
+async def edit_file_tool(path: str, old_str: str, new_str: str) -> Dict[str, Any]:
     """
     Replaces first occurrence of old_str with new_str in file. If old_str is empty, creates/overwrites file with new_str.
     :param path: The path to the file to edit.
